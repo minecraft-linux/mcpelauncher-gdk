@@ -141,6 +141,8 @@ sym_not_found:
 }
 
 #ifdef SONAME_LIBVULKAN
+#undef SONAME_LIBVULKAN
+#define SONAME_LIBVULKAN "/usr/local/lib/libvulkan.1.4.341.dylib"
 
 static void *vulkan_handle;
 static void *(*p_vkGetInstanceProcAddr)(VkInstance, const char *);

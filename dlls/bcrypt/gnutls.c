@@ -382,7 +382,8 @@ static NTSTATUS gnutls_process_attach( void *args )
         WARN("Setting GNUTLS_SYSTEM_PRIORITY_FILE to \"/dev/null\".\n");
         setenv("GNUTLS_SYSTEM_PRIORITY_FILE", "/dev/null", 0);
     }
-
+#undef SONAME_LIBGNUTLS
+#define SONAME_LIBGNUTLS "/usr/local/lib/libgnutls.30.dylib"
     if (!(libgnutls_handle = dlopen( SONAME_LIBGNUTLS, RTLD_NOW )))
     {
         ERR_(winediag)( "failed to load libgnutls, no support for encryption\n" );

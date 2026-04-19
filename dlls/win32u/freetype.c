@@ -72,6 +72,8 @@
 #include "wine/list.h"
 
 #ifdef SONAME_LIBFREETYPE
+#undef SONAME_LIBFREETYPE
+#define SONAME_LIBFREETYPE "/usr/local/lib/libfreetype.6.dylib"
 
 WINE_DEFAULT_DEBUG_CHANNEL(font);
 

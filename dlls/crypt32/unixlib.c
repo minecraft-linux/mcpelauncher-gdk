@@ -33,6 +33,8 @@
 #include <Security/Security.h>
 #endif
 #ifdef SONAME_LIBGNUTLS
+#undef SONAME_LIBGNUTLS
+#define SONAME_LIBGNUTLS "/usr/local/lib/libgnutls.30.dylib"
 #include <gnutls/pkcs12.h>
 #endif
 
