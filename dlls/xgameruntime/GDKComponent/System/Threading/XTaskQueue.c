@@ -1948,6 +1948,19 @@ HRESULT XTaskQueueCreateComposite( XTaskQueuePortHandle workPort, XTaskQueuePort
 
 BOOLEAN XTaskQueueDispatch( XTaskQueueHandle queue, XTaskQueuePort port, UINT32 timeoutInMs )
 {
+
+    /* === Freeze Debug: Step 5 - XTaskQueueDispatch trace === */
+    {
+        static long xd_count = 0;
+        xd_count++;
+        if (xd_count <= 10 || xd_count % 50000 == 0)
+        {
+            char buf[128];
+            int tlen = snprintf(buf, sizeof(buf), "[XTQ-TRACE] #%ld Dispatch port=%d timeout=%u\n",
+                xd_count, port, timeoutInMs);
+            fprintf(stderr, "%s", buf); fflush(stderr);
+        }
+    }
     HRESULT hr;
     IXTaskQueuePortContext *portContext;
     IXTaskQueuePort *queuePort;

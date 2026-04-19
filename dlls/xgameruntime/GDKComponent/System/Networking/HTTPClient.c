@@ -97,11 +97,10 @@ static HRESULT httpclient_SendRequest( URL_COMPONENTS uc, HINTERNET *inetRequest
 _CLEANUP:
     if ( FAILED( status ) )
     {
-        if ( *inetRequest ) WinHttpCloseHandle( *inetRequest );
-        *inetRequest = NULL;
+        if ( *inetRequest ) { WinHttpCloseHandle( *inetRequest ); *inetRequest = NULL; }
     }
-    if ( inetSession ) WinHttpCloseHandle( inetSession );
     if ( inetConnect ) WinHttpCloseHandle( inetConnect );
+    if ( inetSession ) WinHttpCloseHandle( inetSession );
     if ( hostName ) HeapFree( GetProcessHeap(), 0, hostName );
     if ( urlPath ) HeapFree( GetProcessHeap(), 0, urlPath );
     return status;
@@ -239,13 +238,31 @@ HRESULT httpclient_ObtainSecurityInformationForUrl( LPCWSTR url, BYTE **outBuffe
     SIZE_T totalBufferSize;
     SIZE_T thumbprintBytes = 0;
     HRESULT status = S_OK;
-    HINTERNET inetRequest;
+    HINTERNET inetRequest = NULL;
     URL_COMPONENTS uc = { .dwStructSize = sizeof(URL_COMPONENTS), 
         .dwSchemeLength = (DWORD)-1, .dwHostNameLength = (DWORD)-1, .dwUrlPathLength = (DWORD)-1, .dwExtraInfoLength = (DWORD)-1 };
     XNetworkingSecurityInformation *information = NULL;
 
-    FIXME( "url %s, securityInformation %p\n", debugstr_w( url ), securityInformation );
+    FIXME( "[PATCH-K2] url %s — returning zeroed security info struct\n", debugstr_w( url ) );
 
+    information = (XNetworkingSecurityInformation *)calloc( 1, sizeof(*information) );
+    if (!information)
+    {
+        if (outBuffer) *outBuffer = NULL;
+        if (outBufferByteCount) *outBufferByteCount = 0;
+        if (securityInformation) *securityInformation = NULL;
+        return E_OUTOFMEMORY;
+    }
+    information->thumbprintCount = 0;
+    information->thumbprints = NULL;
+    information->enabledHttpSecurityProtocolFlags = 0;
+
+    if (securityInformation) *securityInformation = information;
+    if (outBuffer) *outBuffer = (BYTE *)information;
+    if (outBufferByteCount) *outBufferByteCount = sizeof(*information);
+    return S_OK;
+
+    /* --- original code below, unreachable after PATCH-K --- */
     if ( !WinHttpCrackUrl( url, 0, 0, &uc ) )
     {
         status = HRESULT_FROM_WIN32( GetLastError() );

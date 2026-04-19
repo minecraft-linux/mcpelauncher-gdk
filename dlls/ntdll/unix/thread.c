@@ -1608,6 +1608,18 @@ NTSTATUS send_debug_event( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL first_c
  */
 NTSTATUS WINAPI NtRaiseException( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL first_chance )
 {
+    if (rec->ExceptionCode == 0xc0000008) {
+        char buf[128];
+        int len = snprintf(buf, sizeof(buf),
+            "[PATCH-N] NtRaiseException: code=0x%x flags=%x first_chance=%d addr=%p\n",
+            (unsigned)rec->ExceptionCode, (unsigned)rec->ExceptionFlags, first_chance, rec->ExceptionAddress);
+        write(2, buf, len);
+        if (!first_chance) {
+            write(2, "[PATCH-N] Second chance! Terminating thread only.\n", 50);
+            NtTerminateThread( NtCurrentThread(), rec->ExceptionCode );
+            return STATUS_SUCCESS;
+        }
+    }
     NTSTATUS status = send_debug_event( rec, context, first_chance, !(is_win64 || is_wow64() || is_old_wow64()) );
 
     if (status == DBG_CONTINUE || status == DBG_EXCEPTION_HANDLED)
@@ -1623,6 +1635,12 @@ NTSTATUS WINAPI NtRaiseException( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL 
         ERR_(seh)("Unhandled exception code %x flags %x addr %p\n",
                   rec->ExceptionCode, rec->ExceptionFlags, rec->ExceptionAddress );
 
+    if (rec->ExceptionCode == 0xc0000008 /* STATUS_INVALID_HANDLE */)
+    {
+        ERR_(seh)("[PATCH-L] Suppressing STATUS_INVALID_HANDLE — terminating thread only, not process\n");
+        NtTerminateThread( NtCurrentThread(), rec->ExceptionCode );
+        return STATUS_SUCCESS;
+    }
     NtTerminateProcess( NtCurrentProcess(), rec->ExceptionCode );
     return STATUS_SUCCESS;
 }

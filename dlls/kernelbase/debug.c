@@ -544,6 +544,14 @@ static BOOL start_debugger( EXCEPTION_POINTERS *epointers, HANDLE event )
     char buffer[256];
 
     format_exception_msg( epointers, buffer, sizeof(buffer) );
+
+    if (epointers->ExceptionRecord->ExceptionCode == 0xc0000008 /* STATUS_INVALID_HANDLE */)
+    {
+        MESSAGE( "wine: [PATCH-T] %s (thread %04lx) — STATUS_INVALID_HANDLE, terminating thread only\n", buffer, GetCurrentThreadId() );
+        NtTerminateThread( GetCurrentThread(), epointers->ExceptionRecord->ExceptionCode );
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
     MESSAGE( "wine: %s (thread %04lx), starting debugger...\n", buffer, GetCurrentThreadId() );
 
     InitializeObjectAttributes( &attr, &nameW, 0, 0, NULL );

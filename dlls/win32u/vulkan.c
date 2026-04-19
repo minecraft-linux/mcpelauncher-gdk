@@ -611,6 +611,29 @@ static VkResult win32u_vkCreateInstance( const VkInstanceCreateInfo *client_crea
     list_init( &instance->report_callbacks );
 
     if ((res = convert_instance_create_info( &pool, create_info, instance ))) goto failed;
+
+    /* macOS MoltenVK: force portability enumeration */
+    {
+        uint32_t i;
+        int has_portability = 0;
+        static const char *portability_ext = "VK_KHR_portability_enumeration";
+        create_info->flags |= 0x00000001; /* VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR */
+        for (i = 0; i < create_info->enabledExtensionCount; i++) {
+            if (strcmp(create_info->ppEnabledExtensionNames[i], portability_ext) == 0) {
+                has_portability = 1;
+                break;
+            }
+        }
+        if (!has_portability) {
+            const char **new_exts = malloc((create_info->enabledExtensionCount + 1) * sizeof(char *));
+            memcpy(new_exts, create_info->ppEnabledExtensionNames,
+                   create_info->enabledExtensionCount * sizeof(char *));
+            new_exts[create_info->enabledExtensionCount] = portability_ext;
+            create_info->ppEnabledExtensionNames = new_exts;
+            create_info->enabledExtensionCount++;
+        }
+    }
+
     if ((res = p_vkCreateInstance( create_info, NULL /* allocator */, &host_instance ))) goto failed;
 
     vulkan_object_init_ptr( &instance->obj.obj, (UINT_PTR)host_instance, &client_instance->obj );
@@ -3022,6 +3045,10 @@ static const struct vulkan_driver_funcs lazydrv_funcs =
     .p_map_device_extensions = lazydrv_map_device_extensions,
 };
 
+PFN_vkVoidFunction __proc(VkDevice device, const char *pName) {
+    return NULL;
+}
+
 static void vulkan_init_once(void)
 {
     struct vulkan_instance_extensions extensions = {0};
@@ -3030,6 +3057,8 @@ static void vulkan_init_once(void)
     VkResult res;
 
 #ifdef SONAME_LIBVULKAN
+#undef SONAME_LIBVULKAN
+#define SONAME_LIBVULKAN "/usr/local/lib/libvulkan.1.4.341.dylib"
     vulkan_handle = dlopen( SONAME_LIBVULKAN, RTLD_NOW );
     if (!vulkan_handle) ERR( "Failed to load %s\n", SONAME_LIBVULKAN );
 #else
@@ -3047,6 +3076,7 @@ static void vulkan_init_once(void)
     }
 
     LOAD_FUNCPTR( vkGetDeviceProcAddr );
+    // p_vkGetDeviceProcAddr = __proc;
     LOAD_FUNCPTR( vkGetInstanceProcAddr );
 #undef LOAD_FUNCPTR
 

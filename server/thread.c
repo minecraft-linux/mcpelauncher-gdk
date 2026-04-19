@@ -1327,6 +1327,34 @@ static int select_on( const union select_op *select_op, data_size_t op_size, cli
             set_error( STATUS_INVALID_PARAMETER );
             return 1;
         }
+        /* === Freeze Debug: Step 6 - print handle object type === */
+        {
+            static int ht_count = 0;
+            ht_count++;
+            if (ht_count <= 20 || ht_count % 50000 == 0)
+            {
+                unsigned int i;
+                for (i = 0; i < count; i++)
+                {
+                    struct object *obj = get_handle_obj( current->process, select_op->wait.handles[i], SYNCHRONIZE, NULL );
+                    if (obj)
+                    {
+                        fprintf( stderr, "[HT-TRACE] #%d handle=0x%x ops=%p timeout=%s count=%u\n",
+                            ht_count, select_op->wait.handles[i],
+                            (void*)obj->ops,
+                            when == TIMEOUT_INFINITE ? "INF" : "finite",
+                            count );
+                        release_object( obj );
+                    }
+                    else
+                    {
+                        fprintf( stderr, "[HT-TRACE] #%d handle=0x%x type=INVALID count=%u\n",
+                            ht_count, select_op->wait.handles[i], count );
+                        clear_error();
+                    }
+                }
+            }
+        }
         if (!wait_on_handles( select_op, count, select_op->wait.handles, flags, when ))
             return 1;
         break;

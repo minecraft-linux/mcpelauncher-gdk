@@ -688,7 +688,7 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
     TRACE("Application: %s.\n", debugstr_a(application_info.pApplicationName));
     TRACE("vkd3d API version: %u.\n", instance->api_version);
 
-    if (!(extensions = vkd3d_calloc(extension_count, sizeof(*extensions))))
+    if (!(extensions = vkd3d_calloc(extension_count + 1, sizeof(*extensions))))
     {
         if (instance->libvulkan)
             vkd3d_dlclose(instance->libvulkan);
@@ -700,7 +700,7 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
 
     instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instance_info.pNext = NULL;
-    instance_info.flags = 0;
+    instance_info.flags = 0x00000001; /* VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR for MoltenVK */
     instance_info.pApplicationInfo = &application_info;
     instance_info.enabledLayerCount = 0;
     instance_info.ppEnabledLayerNames = NULL;
@@ -710,6 +710,7 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
             optional_extensions ? optional_extensions->extensions : NULL,
             optional_extensions ? optional_extensions->extension_count : 0,
             user_extension_supported, &instance->vk_info);
+    extensions[instance_info.enabledExtensionCount++] = "VK_KHR_portability_enumeration"; /* MoltenVK */
     instance_info.ppEnabledExtensionNames = extensions;
     vkd3d_free(user_extension_supported);
 
@@ -2303,7 +2304,7 @@ static HRESULT vkd3d_create_vk_device(struct d3d12_device *device,
             &extension_count, &user_extension_supported)))
         return hr;
 
-    if (!(extensions = vkd3d_calloc(extension_count, sizeof(*extensions))))
+    if (!(extensions = vkd3d_calloc(extension_count + 1, sizeof(*extensions))))
     {
         vkd3d_free(user_extension_supported);
         return E_OUTOFMEMORY;

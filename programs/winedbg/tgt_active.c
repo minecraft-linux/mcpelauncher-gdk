@@ -1038,6 +1038,14 @@ static BOOL tgt_process_active_close_process(struct dbg_process* pcs, BOOL kill)
         if (pcs == dbg_curr_process && dbg_curr_thread->in_exception)
             exit_code = dbg_curr_thread->excpt_record.ExceptionCode;
 
+        if (exit_code == 0xc0000008 /* STATUS_INVALID_HANDLE */ && dbg_curr_thread)
+        {
+            fprintf(stderr, "[PATCH-O] STATUS_INVALID_HANDLE in thread %04lx: terminating thread only\n",
+                    dbg_curr_thread->tid);
+            TerminateThread(dbg_curr_thread->handle, exit_code);
+            return TRUE;
+        }
+
         TerminateProcess(pcs->handle, exit_code);
     }
     else if (pcs == dbg_curr_process)

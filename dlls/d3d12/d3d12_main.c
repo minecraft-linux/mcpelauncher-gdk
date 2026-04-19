@@ -273,7 +273,12 @@ static VkPhysicalDevice d3d12_get_vk_physical_device(struct vkd3d_instance *inst
         }
     }
 
-    if (!vk_physical_device)
+    if (!vk_physical_device && count > 0)
+    {
+        FIXME("Could not find Vulkan physical device for DXGI adapter, using first available.\n");
+        vk_physical_device = vk_physical_devices[0];
+    }
+    else if (!vk_physical_device)
         FIXME("Could not find Vulkan physical device for DXGI adapter.\n");
 
 done:
@@ -297,6 +302,7 @@ HRESULT WINAPI D3D12CreateDevice(IUnknown *adapter, D3D_FEATURE_LEVEL minimum_fe
     {
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+        "VK_KHR_portability_enumeration",
     };
     static const char * const optional_instance_extensions[] =
     {

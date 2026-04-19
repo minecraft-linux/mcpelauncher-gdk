@@ -64,8 +64,10 @@ extern void WINAPI process_breakpoint(void);
 static inline BOOL is_valid_frame( ULONG_PTR frame )
 {
     if (frame & (sizeof(void*) - 1)) return FALSE;
-    return ((void *)frame >= NtCurrentTeb()->Tib.StackLimit &&
-            (void *)frame <= NtCurrentTeb()->Tib.StackBase);
+    if ((void *)frame >= NtCurrentTeb()->Tib.StackLimit &&
+        (void *)frame <= NtCurrentTeb()->Tib.StackBase) return TRUE;
+    /* allow fiber/coroutine stacks outside normal stack limits */
+    return (frame >= 0x10000 && frame < 0x7fffffffffff);
 }
 
 extern void WINAPI LdrInitializeThunk(CONTEXT*,ULONG_PTR,ULONG_PTR,ULONG_PTR);

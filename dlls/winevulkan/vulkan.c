@@ -399,6 +399,24 @@ VkResult wine_vkCreateInstance(const VkInstanceCreateInfo *client_create_info, c
         list_add_tail(&report_callbacks, &report_callback->entry);
     }
 
+    /* macOS MoltenVK: force portability enumeration */
+    create_info->flags |= 0x00000001; /* VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR */
+    static const char *portability_ext = "VK_KHR_portability_enumeration";
+    int has_portability = 0;
+    for (uint32_t i = 0; i < create_info->enabledExtensionCount; i++) {
+        if (strcmp(create_info->ppEnabledExtensionNames[i], portability_ext) == 0) {
+            has_portability = 1;
+            break;
+        }
+    }
+    if (!has_portability) {
+        const char **new_exts = malloc((create_info->enabledExtensionCount + 1) * sizeof(char *));
+        memcpy(new_exts, create_info->ppEnabledExtensionNames,
+               create_info->enabledExtensionCount * sizeof(char *));
+        new_exts[create_info->enabledExtensionCount] = portability_ext;
+        create_info->ppEnabledExtensionNames = new_exts;
+        create_info->enabledExtensionCount++;
+    }
     return vk_funcs->p_vkCreateInstance(create_info, NULL /* allocator */, client_instance_ptr);
 
 failed:
