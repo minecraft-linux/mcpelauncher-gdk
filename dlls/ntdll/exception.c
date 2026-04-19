@@ -257,14 +257,6 @@ NTSTATUS WINAPI dispatch_exception( EXCEPTION_RECORD *rec, CONTEXT *context )
     if ((status = call_seh_handlers( rec, context )) == STATUS_SUCCESS)
         NtContinue( context, FALSE );
 
-    if (rec->ExceptionCode == 0xc0000008 /* STATUS_INVALID_HANDLE */)
-    {
-        ERR("[PATCH-R] STATUS_INVALID_HANDLE unhandled at %p — terminating thread only\n",
-            rec->ExceptionAddress);
-        NtTerminateThread( GetCurrentThread(), rec->ExceptionCode );
-        return STATUS_SUCCESS;
-    }
-
     if (status != STATUS_UNHANDLED_EXCEPTION) RtlRaiseStatus( status );
     return NtRaiseException( rec, context, FALSE );
 }
@@ -426,24 +418,6 @@ EXCEPTION_DISPOSITION WINAPI call_unhandled_exception_handler( EXCEPTION_RECORD 
         return ExceptionContinueExecution;
     case EXCEPTION_EXECUTE_HANDLER:
         break;
-    }
-    if (rec->ExceptionCode == 0xc0000008 /* STATUS_INVALID_HANDLE */)
-    {
-        ULONG_PTR i;
-        ERR("[PATCH-S2] STATUS_INVALID_HANDLE at %p flags=%lx in thread %04lx\n",
-            rec->ExceptionAddress, rec->ExceptionFlags, GetCurrentThreadId());
-        for (i = 0; i < rec->NumberParameters && i < EXCEPTION_MAXIMUM_PARAMETERS; i++)
-            ERR("[PATCH-S2]   info[%lu] = %p\n", i, (void*)rec->ExceptionInformation[i]);
-        ERR("[PATCH-S2] context: rip=%p rsp=%p rbp=%p\n",
-            (void*)context->Rip, (void*)context->Rsp, (void*)context->Rbp);
-        ERR("[PATCH-S2] context: rax=%p rbx=%p rcx=%p rdx=%p\n",
-            (void*)context->Rax, (void*)context->Rbx, (void*)context->Rcx, (void*)context->Rdx);
-        ERR("[PATCH-S2] context: r8=%p r9=%p r10=%p r11=%p\n",
-            (void*)context->R8, (void*)context->R9, (void*)context->R10, (void*)context->R11);
-        ERR("[PATCH-S2] context: r12=%p r13=%p r14=%p r15=%p\n",
-            (void*)context->R12, (void*)context->R13, (void*)context->R14, (void*)context->R15);
-        NtTerminateThread( GetCurrentThread(), rec->ExceptionCode );
-        return ExceptionContinueExecution;
     }
     NtTerminateProcess( GetCurrentProcess(), rec->ExceptionCode );
     return ExceptionContinueExecution;

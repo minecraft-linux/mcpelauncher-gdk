@@ -20,7 +20,6 @@
 
 #include "initguid.h"
 #include "private.h"
-#include <unistd.h>
 
 #include "GDKComponent/InitInternalGDKC.h"
 
@@ -198,17 +197,10 @@ HRESULT WINAPI QueryApiImpl( const GUID *runtimeClassId, REFIID interfaceId, voi
          */
         if ( !func )
         {
-            /* === Patch U: Cache LoadOtherRuntime to avoid registry busy loop === */
-            static BOOLEAN lor_cached = FALSE;
-            static DWORD lor_asked_cache = 0;
-            if ( !lor_cached )
+            LoadOtherRuntime( &asked );
+            if ( !asked )
             {
-                LoadOtherRuntime( &lor_asked_cache );
-                lor_cached = TRUE;
-                if ( !lor_asked_cache )
-                {
-                    MessageBoxA( NULL, "The game has requested XThreading\nIt's recommended that you use Microsoft's native binary for this instead.\nTo do so, copy xgameruntime.dll from a Windows machine and place it under the name \"xgameruntime.dll.threading\" within either the game's binaries or within your prefix's system32 folder.\nYou won't be asked this again.", "Attention Required!", MB_ICONEXCLAMATION );
-                }
+                MessageBoxA( NULL, "The game has requested XThreading\nIt's recommended that you use Microsoft's native binary for this instead.\nTo do so, copy xgameruntime.dll from a Windows machine and place it under the name \"xgameruntime.dll.threading\" within either the game's binaries or within your prefix's system32 folder.\nYou won't be asked this again.", "Attention Required!", MB_ICONEXCLAMATION );
             }
             return IXThreadingImpl_QueryInterface( x_threading_impl, interfaceId, out );
         }
@@ -219,17 +211,6 @@ HRESULT WINAPI QueryApiImpl( const GUID *runtimeClassId, REFIID interfaceId, voi
         return IXNetworkingImpl_QueryInterface( x_networking_impl, interfaceId, out );
     }
     
-    /* === Freeze Debug Patch: Step 1 === */
-    {
-        static LONG notimpl_count = 0;
-        LONG c = InterlockedIncrement(&notimpl_count);
-        if (c <= 10 || c % 1000 == 0) {
-            char buf[128];
-            int len = sprintf(buf, "[FREEZE-TRACE] QueryApiImpl E_NOTIMPL #%ld, GUID=%08lx-%04x-%04x\n",
-                c, runtimeClassId->Data1, runtimeClassId->Data2, runtimeClassId->Data3);
-            write(2, buf, len);
-        }
-    }
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( runtimeClassId ) );
     return E_NOTIMPL;
 }

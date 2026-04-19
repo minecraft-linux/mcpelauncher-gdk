@@ -47,18 +47,9 @@
 
 int get_inproc_device_fd(void)
 {
-#ifdef __APPLE__
-    fprintf(stderr, "[WineGDK] ntsync disabled on macOS\n");
-    return -1;  /* macOS has no /dev/ntsync */
-#else
     static int fd = -2;
-    if (fd == -2)
-    {
-        fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
-        if (fd < 0) fd = -1;  /* cache failure, never a garbage value */
-    }
+    if (fd == -2) fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
     return fd;
-#endif
 }
 
 struct inproc_sync

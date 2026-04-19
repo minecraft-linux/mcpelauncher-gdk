@@ -1719,14 +1719,6 @@ void call_raise_user_exception_dispatcher(void)
  */
 NTSTATUS call_user_exception_dispatcher( EXCEPTION_RECORD *rec, CONTEXT *context )
 {
-    if (rec->ExceptionCode == 0xc0000008 /* STATUS_INVALID_HANDLE */
-        && (rec->ExceptionFlags & 1) /* EXCEPTION_NONCONTINUABLE */)
-    {
-        ERR_(seh)("[PATCH-M] Intercepted NONCONTINUABLE STATUS_INVALID_HANDLE at %p — killing thread\n",
-                  rec->ExceptionAddress);
-        NtTerminateThread( NtCurrentThread(), rec->ExceptionCode );
-        return STATUS_SUCCESS;
-    }
     struct syscall_frame *frame = get_syscall_frame();
     struct exc_stack_layout *stack;
     NTSTATUS status = NtSetContextThread( GetCurrentThread(), context );
