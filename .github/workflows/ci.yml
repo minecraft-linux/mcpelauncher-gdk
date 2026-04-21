@@ -1,0 +1,192 @@
+name: ci
+on:
+  workflow_dispatch:
+    inputs:
+      mcpelauncher_ref:
+        description: "mcpelauncher-gdk ref to build"
+        required: false
+        default: "macOS"
+      vulkan_sdk_version:
+        description: "LunarG Vulkan SDK version"
+        required: false
+        default: "1.4.341.1"
+  push:
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  INTEL_BREW: /usr/local/bin/brew
+  INTEL_PREFIX: /usr/local
+  WORKROOT: ${{ github.workspace }}/work
+  STAGE: ${{ github.workspace }}/stage
+  DIST: ${{ github.workspace }}/dist
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out workflow repo
+        uses: actions/checkout@v6
+
+      - name: Show runner info
+        shell: bash
+        run: |
+          set -euxo pipefail
+          uname -a
+          uname -m
+          sw_vers
+          sysctl -n machdep.cpu.brand_string || true
+
+      - name: Install Rosetta
+        shell: bash
+        run: |
+          set -euxo pipefail
+          softwareupdate --install-rosetta --agree-to-license || true
+
+      - name: Install Intel Homebrew
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          if [ ! -x /usr/local/bin/brew ]; then
+            arch -x86_64 /bin/bash -c \
+              "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          fi
+
+          arch -x86_64 /usr/local/bin/brew --version
+          arch -x86_64 /usr/local/bin/brew config
+
+      - name: Install Intel brew dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          arch -x86_64 "${INTEL_BREW}" install gnutls freetype
+          brew install llvm@21 bison
+          $(brew --prefix llvm@21)/bin/llvm-dlltool --version
+          
+          echo "LLVM_BINDIR=$(brew --prefix llvm@21)/bin" >> "$GITHUB_ENV"
+          echo "$(brew --prefix llvm@21)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+
+      - name: Prepare directories
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "$WORKROOT" "$STAGE" "$DIST"
+          mkdir -p "$WORKROOT"/downloads "$WORKROOT"/toolchains "$WORKROOT"/src "$WORKROOT"/runtime
+
+      - name: Install LunarG Vulkan SDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          VULKAN_SDK_VERSION="${{ inputs.vulkan_sdk_version || '1.4.341.1' }}"
+          SDK_ZIP="vulkansdk-macos-${VULKAN_SDK_VERSION}.zip"
+          SDK_URL="https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/mac/${SDK_ZIP}?Human=true"
+
+          curl -L --retry 3 --fail -o "$WORKROOT/downloads/${SDK_ZIP}" "$SDK_URL"
+          unzip -q "$WORKROOT/downloads/${SDK_ZIP}" -d "$WORKROOT/downloads"
+
+          SDK_APP="$(find "$WORKROOT/downloads" -type d -name 'vulkansdk-macOS-*.app' | head -n1)"
+          if [ -z "$SDK_APP" ]; then
+            echo "Could not find Vulkan SDK app bundle"
+            exit 1
+          fi
+
+          sudo "$SDK_APP/Contents/MacOS/InstallVulkan" \
+            --root "$HOME/VulkanSDK" \
+            --accept-licenses \
+            --default-answer \
+            --confirm-command install
+
+          SDK_DIR="$(find "$HOME/VulkanSDK" -maxdepth 1 -type d -name "${VULKAN_SDK_VERSION}" | head -n1)"
+          if [ -z "$SDK_DIR" ]; then
+            echo "Could not find installed Vulkan SDK dir"
+            exit 1
+          fi
+
+          echo "VULKAN_SDK=$SDK_DIR/macOS" >> "$GITHUB_ENV"
+          echo "$SDK_DIR/macOS/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch mcpelauncher-gdk macOS branch
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone --depth 1 --branch "${{ inputs.mcpelauncher_ref || 'macOS' }}" \
+            https://github.com/minecraft-linux/mcpelauncher-gdk.git \
+            "$WORKROOT/src/mcpelauncher-gdk"
+
+      - name: Build (autotools style)
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          cd "$WORKROOT/src/mcpelauncher-gdk"
+
+          export SDKROOT="$(xcrun --show-sdk-path)"
+
+          ./configure --prefix="$STAGE" CC=clang CXX=clang++ "CFLAGS=-I/usr/local/include --target=x86_64-apple-darwin" "LDFLAGS=-fuse-ld=lld --target=x86_64-apple-darwin -L$MOLTENVK_DIR/dynamic/dylib/macOS -L/usr/local/lib" "x86_64_CC=${LLVM_BINDIR}/clang" "x86_64_CXX=${LLVM_BINDIR}/clang++" "x86_64_CFLAGS=-g -gcodeview" x86_64_LDFLAGS=-fuse-ld=lld --enable-archs=x86_64 --build=x86_64-apple-darwin --host=x86_64-apple-darwin FREETYPE_CFLAGS=-I/usr/local/include/freetype2 FREETYPE_LIBS=/usr/local/lib/libfreetype.dylib build_alias=x86_64-apple-darwin host_alias=x86_64-apple-darwin
+
+          make -j$(sysctl -n hw.ncpu)
+          make install
+
+      - name: Install into staging
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --install "$WORKROOT/build"
+
+      - name: Bundle runtime dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p "$STAGE/lib" "$STAGE/share/minecraft-gdk-runtime"
+
+          # Copy Intel brew dylibs that are likely needed at runtime.
+          # Adjust the list if your final binary links more dependencies.
+          for dylib in \
+            "${INTEL_PREFIX}/opt/gnutls/lib/libgnutls."*.dylib \
+            "${INTEL_PREFIX}/opt/freetype/lib/libfreetype."*.dylib
+          do
+            [ -e "$dylib" ] || continue
+            cp -av "$dylib" "$STAGE/lib/"
+          done
+
+      - name: Rewrite dylib paths to be self-contained
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mapfile -t BINARIES < <(find "$STAGE" -type f \( -perm -111 -o -name '*.dylib' \))
+
+          for f in "${BINARIES[@]}"; do
+            otool -L "$f" || true
+          done
+
+          # Example path fixups for copied brew dylibs
+          for f in "${BINARIES[@]}"; do
+            install_name_tool -change "${INTEL_PREFIX}/opt/gnutls/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/gnutls/lib/libgnutls.*.dylib | head -n1)")" \
+              "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libgnutls.*.dylib | head -n1)")" "$f" || true
+
+            install_name_tool -change "${INTEL_PREFIX}/opt/freetype/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/freetype/lib/libfreetype.*.dylib | head -n1)")" \
+              "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libfreetype.*.dylib | head -n1)")" "$f" || true
+          done
+
+      - name: Create self-contained bottle archive
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          NAME="mcpelauncher-gdk-macos-intel"
+          tar -C "$STAGE" -czf "$DIST/${NAME}.tar.gz" .
+
+          shasum -a 256 "$DIST/${NAME}.tar.gz" | tee "$DIST/${NAME}.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: mcpelauncher-gdk-macos-intel-bottle
+          path: dist/*
+          if-no-files-found: error
