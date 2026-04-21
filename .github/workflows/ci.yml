@@ -63,7 +63,7 @@ jobs:
           set -euxo pipefail
           arch -x86_64 "${INTEL_BREW}" install gnutls freetype
           brew install llvm@21 bison
-          $(brew --prefix llvm@21)/bin/llvm-dlltool --version
+          $(brew --prefix llvm@21)/bin/llvm-dlltool --help
           
           echo "LLVM_BINDIR=$(brew --prefix llvm@21)/bin" >> "$GITHUB_ENV"
           echo "$(brew --prefix llvm@21)/bin" >> "$GITHUB_PATH"
