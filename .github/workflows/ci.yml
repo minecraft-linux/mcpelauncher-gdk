@@ -69,16 +69,13 @@ jobs:
           echo Update Env
           echo "VULKAN_LOADER_DIR=$(arch -x86_64 "${INTEL_BREW}" --prefix vulkan-loader)" >> "$GITHUB_ENV"
           echo Update Env
-          echo "/usr/bin" >> "$GITHUB_PATH"
-          echo Update Env
           echo "$(brew --prefix llvm@21)/bin" >> "$GITHUB_PATH"
           echo Update Env
-          echo "$(brew --prefix lld@21)/bin" >> "$GITHUB_PATH"
-          echo Update Env
-          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix lld@21)/bin" >> "$GITHUB_PATH""
           echo Update Env
           echo "/usr/bin" >> "$GITHUB_PATH"
-
+          echo Update Env
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH
       - name: Prepare directories
         shell: bash
         run: |
