@@ -69,11 +69,15 @@ jobs:
           echo Update Env
           echo "VULKAN_LOADER_DIR=$(arch -x86_64 "${INTEL_BREW}" --prefix vulkan-loader)" >> "$GITHUB_ENV"
           echo Update Env
+          echo "$(which clang)/.." >> "$GITHUB_PATH"
+          echo Update Env
           echo "$(brew --prefix llvm@21)/bin" >> "$GITHUB_PATH"
           echo Update Env
           echo "$(brew --prefix lld@21)/bin" >> "$GITHUB_PATH"
           echo Update Env
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          echo Update Env
+          echo "$(which clang)/.." >> "$GITHUB_PATH"
 
       - name: Prepare directories
         shell: bash
@@ -86,7 +90,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          git clone --depth 1 --branch "${{ inputs.mcpelauncher_ref || 'macOS' }}" \
+          git clone --depth 1 --branch "${{ inputs.mcpelauncher_ref || '${{ github.ref_name }}' }}" \
             https://github.com/minecraft-linux/mcpelauncher-gdk.git \
             "$WORKROOT/src/mcpelauncher-gdk"
 
@@ -98,6 +102,8 @@ jobs:
           cd "$WORKROOT/src/mcpelauncher-gdk"
 
           export SDKROOT="$(xcrun --show-sdk-path)"
+
+          echo "PATH=$PATH"
 
           arch -x86_64 ./configure --prefix="$STAGE" CC=clang CXX=clang++ "CFLAGS=-I/usr/local/include -I{VULKAN_HEADER_DIR/include --target=x86_64-apple-darwin" "LDFLAGS=-L$VULKAN_LOADER_DIR/lib -L/usr/local/lib" "x86_64_CC=${LLVM_BINDIR}/clang" "x86_64_CXX=${LLVM_BINDIR}/clang++" "x86_64_CFLAGS=-g -gcodeview" x86_64_LDFLAGS=-fuse-ld=lld --enable-archs=x86_64 --build=x86_64-apple-darwin --host=x86_64-apple-darwin FREETYPE_CFLAGS=-I/usr/local/include/freetype2 FREETYPE_LIBS=/usr/local/lib/libfreetype.6.dylib build_alias=x86_64-apple-darwin host_alias=x86_64-apple-darwin
 
