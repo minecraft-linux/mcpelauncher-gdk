@@ -102,7 +102,7 @@ jobs:
 
           echo "PATH=$PATH"
 
-          arch -x86_64 ./configure --prefix="$STAGE" CC=clang CXX=clang++ "CFLAGS=-I/usr/local/include -I$VULKAN_HEADER_DIR/include --target=x86_64-apple-darwin" "LDFLAGS=-L$VULKAN_LOADER_DIR/lib -L/usr/local/lib" "x86_64_CC=${LLVM_BINDIR}/clang" "x86_64_CXX=${LLVM_BINDIR}/clang++" "x86_64_CFLAGS=-g -gcodeview" x86_64_LDFLAGS=-fuse-ld=lld --enable-archs=x86_64 --build=x86_64-apple-darwin --host=x86_64-apple-darwin FREETYPE_CFLAGS=-I/usr/local/include/freetype2 FREETYPE_LIBS=/usr/local/lib/libfreetype.6.dylib build_alias=x86_64-apple-darwin host_alias=x86_64-apple-darwin
+          arch -x86_64 ./configure --prefix="$STAGE" CC=clang CXX=clang++ "CFLAGS=-O3 -I/usr/local/include -I$VULKAN_HEADER_DIR/include --target=x86_64-apple-darwin" "LDFLAGS=-L$VULKAN_LOADER_DIR/lib -L/usr/local/lib" "x86_64_CC=${LLVM_BINDIR}/clang" "x86_64_CXX=${LLVM_BINDIR}/clang++" "x86_64_CFLAGS=-O3" x86_64_LDFLAGS=-fuse-ld=lld --enable-archs=x86_64 --build=x86_64-apple-darwin --host=x86_64-apple-darwin FREETYPE_CFLAGS=-I/usr/local/include/freetype2 FREETYPE_LIBS=/usr/local/lib/libfreetype.6.dylib build_alias=x86_64-apple-darwin host_alias=x86_64-apple-darwin
 
           arch -x86_64 make -j$(sysctl -n hw.ncpu)
           arch -x86_64 make install
@@ -129,15 +129,45 @@ jobs:
           set -euxo pipefail
 
           NAME="mcpelauncher-gdk-macos-intel"
+          echo "ARTIFACT_NAME=${NAME}" >> "$GITHUB_ENV"
           tar -C "$STAGE" -czf "$DIST/${NAME}.tar.gz" .
 
           shasum -a 256 "$DIST/${NAME}.tar.gz" | tee "$DIST/${NAME}.sha256"
 
-      - name: Upload artifact
+      - name: Upload bottle artifact
         uses: actions/upload-artifact@v7
         with:
           name: mcpelauncher-gdk-macos-intel-bottle
-          path: dist/*
+          path: dist/${{ env.ARTIFACT_NAME }}.tar.gz
+          archive: false
+          if-no-files-found: error
+
+      - name: Upload bottle checksum artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: mcpelauncher-gdk-macos-intel-bottle-sha256
+          path: dist/${{ env.ARTIFACT_NAME }}.sha256
+          archive: false
+          if-no-files-found: error
+
+      - name: Create macOS app bundle
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          APP_BUILD_DIR="$WORKROOT/app"
+          APP_NAME="mcpelauncher-gdk-macos-intel"
+
+          mkdir -p "$APP_BUILD_DIR"
+          bash "$GITHUB_WORKSPACE/package-macos-app.sh" "$STAGE" "$APP_BUILD_DIR" "$APP_NAME"
+          tar -C "$APP_BUILD_DIR" -czf "$DIST/${APP_NAME}.app.tar.gz" "${APP_NAME}.app"
+
+      - name: Upload app bundle artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: mcpelauncher-gdk-macos-intel-app
+          path: dist/mcpelauncher-gdk-macos-intel.app.tar.gz
+          archive: false
           if-no-files-found: error
 
       - name: Upload Log
@@ -146,4 +176,5 @@ jobs:
         with:
           name: mcpelauncher-gdk-macos-intel-log
           path: work/src/mcpelauncher-gdk/config.log
+          archive: false
           if-no-files-found: ignore

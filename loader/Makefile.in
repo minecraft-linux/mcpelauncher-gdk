@@ -2,11 +2,12 @@ SOURCES = \
 	main.c \
 	preloader.c \
 	preloader_mac.c \
+	wine_bundle_launcher.m \
 	wine.desktop \
 	wine.inf.in \
 	wine_info.plist.in
 
-PROGRAMS = $(WINELOADER_PROGRAMS)
+PROGRAMS = $(WINELOADER_PROGRAMS) wine_bundle_launcher
 INSTALL_LIB = $(WINELOADER_PROGRAMS)
 UNIX_CFLAGS = -fPIE
 
@@ -19,3 +20,6 @@ wine_LDFLAGS = $(WINELOADER_LDFLAGS) $(LDEXECFLAGS) $(PTHREAD_LIBS)
 wine_preloader_OBJS = preloader.o preloader_mac.o
 wine_preloader_DEPS = $(WINELOADER_DEPENDS)
 wine_preloader_LDFLAGS = $(WINEPRELOADER_LDFLAGS)
+
+wine_bundle_launcher_OBJS = wine_bundle_launcher.o
+wine_bundle_launcher_LDFLAGS = $(APPKIT_LIBS) $(PTHREAD_LIBS)
