@@ -19,6 +19,7 @@ typedef NS_ENUM(NSInteger, WineLauncherOpenMode) {
 @property (nonatomic, retain) NSMenuItem *launchItem;
 @property (nonatomic, retain) NSMenuItem *chooseItem;
 @property (nonatomic, retain) NSMenuItem *revealItem;
+@property (nonatomic, retain) NSMenuItem *revealPrefixItem;
 @property (nonatomic, retain) NSMenuItem *alternateOpenItem;
 @property (nonatomic, retain) NSMenu *dockMenu;
 @end
@@ -64,6 +65,7 @@ typedef NS_ENUM(NSInteger, WineLauncherOpenMode) {
     [_launchItem release];
     [_chooseItem release];
     [_revealItem release];
+    [_revealPrefixItem release];
     [_alternateOpenItem release];
     [_dockMenu release];
     [super dealloc];
@@ -79,6 +81,31 @@ typedef NS_ENUM(NSInteger, WineLauncherOpenMode) {
 {
     NSString *path = [[NSUserDefaults standardUserDefaults] stringForKey:WineLauncherExecutablePathKey];
     return path.length ? path : nil;
+}
+
+- (NSURL *)defaultWinePrefixURL
+{
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSURL *baseURL = [fileManager URLForDirectory:NSApplicationSupportDirectory
+                                         inDomain:NSUserDomainMask
+                                appropriateForURL:nil
+                                           create:YES
+                                            error:nil];
+    NSString *bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+    NSString *directoryName = bundleIdentifier.length ? bundleIdentifier : [self appName];
+    NSURL *appSupportURL = [baseURL URLByAppendingPathComponent:directoryName isDirectory:YES];
+
+    return [appSupportURL URLByAppendingPathComponent:@"wineprefix" isDirectory:YES];
+}
+
+- (BOOL)ensureWinePrefixExists:(NSError **)error
+{
+    NSURL *prefixURL = [self defaultWinePrefixURL];
+
+    return [[NSFileManager defaultManager] createDirectoryAtURL:prefixURL
+                                    withIntermediateDirectories:YES
+                                                     attributes:nil
+                                                          error:error];
 }
 
 - (NSURL *)configuredExecutableURLIfValid
@@ -125,6 +152,10 @@ typedef NS_ENUM(NSInteger, WineLauncherOpenMode) {
     [self.revealItem setTarget:self];
     [appMenu addItem:self.revealItem];
 
+    self.revealPrefixItem = [[[NSMenuItem alloc] initWithTitle:@"Reveal Wine Prefix" action:@selector(revealWinePrefix:) keyEquivalent:@""] autorelease];
+    [self.revealPrefixItem setTarget:self];
+    [appMenu addItem:self.revealPrefixItem];
+
     self.alternateOpenItem = [[[NSMenuItem alloc] initWithTitle:@"Alternative Open Mode…" action:@selector(showAlternativeOpenMode:) keyEquivalent:@""] autorelease];
     [self.alternateOpenItem setTarget:self];
     [appMenu addItem:self.alternateOpenItem];
@@ -166,14 +197,19 @@ typedef NS_ENUM(NSInteger, WineLauncherOpenMode) {
     NSMenuItem *revealItem = [[[NSMenuItem alloc] initWithTitle:@"Reveal Configured Executable"
                                                          action:@selector(revealConfiguredExecutable:)
                                                   keyEquivalent:@""] autorelease];
+    NSMenuItem *revealPrefixItem = [[[NSMenuItem alloc] initWithTitle:@"Reveal Wine Prefix"
+                                                               action:@selector(revealWinePrefix:)
+                                                        keyEquivalent:@""] autorelease];
 
     [newInstanceItem setTarget:self];
     [changeExecutableItem setTarget:self];
     [revealItem setTarget:self];
+    [revealPrefixItem setTarget:self];
 
     [dockMenu addItem:newInstanceItem];
     [dockMenu addItem:changeExecutableItem];
     [dockMenu addItem:[NSMenuItem separatorItem]];
+    [dockMenu addItem:revealPrefixItem];
     [dockMenu addItem:revealItem];
 
     self.dockMenu = dockMenu;
@@ -276,10 +312,21 @@ typedef NS_ENUM(NSInteger, WineLauncherOpenMode) {
 
     NSMutableDictionary *environment = [[[NSProcessInfo processInfo] environment] mutableCopy];
     NSTask *task = [[[NSTask alloc] init] autorelease];
+    NSError *prefixError = nil;
+    NSURL *prefixURL = [self defaultWinePrefixURL];
+
+    if (![self ensureWinePrefixExists:&prefixError])
+    {
+        [self showAlertWithMessage:@"Failed to prepare Wine prefix"
+                   informativeText:prefixError.localizedDescription ?: @"Unknown error"];
+        [environment release];
+        return;
+    }
 
     if (self.icdURL.path.length)
         environment[@"VK_ICD_FILENAMES"] = self.icdURL.path;
     environment[@"WINE_D3D_CONFIG"] = @"renderer=vulkan";
+    environment[@"WINEPREFIX"] = prefixURL.path;
 
     task.executableURL = self.wineExecutableURL;
     task.arguments = @[url.path];
@@ -354,6 +401,21 @@ typedef NS_ENUM(NSInteger, WineLauncherOpenMode) {
     [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:@[url]];
 }
 
+- (void)revealWinePrefix:(id)sender
+{
+    NSError *error = nil;
+    NSURL *prefixURL = [self defaultWinePrefixURL];
+
+    if (![self ensureWinePrefixExists:&error])
+    {
+        [self showAlertWithMessage:@"Failed to open Wine prefix"
+                   informativeText:error.localizedDescription ?: @"Unknown error"];
+        return;
+    }
+
+    [[NSWorkspace sharedWorkspace] openURL:prefixURL];
+}
+
 - (void)showAlternativeOpenMode:(id)sender
 {
     NSURL *configuredURL = [self configuredExecutableURLIfValid];
@@ -406,6 +468,8 @@ typedef NS_ENUM(NSInteger, WineLauncherOpenMode) {
         return ![self hasRunningWineTask] && [self isRuntimeAvailableSilently];
     if (action == @selector(revealConfiguredExecutable:))
         return [self configuredExecutableURLIfValid] != nil;
+    if (action == @selector(revealWinePrefix:))
+        return YES;
     if (action == @selector(showAlternativeOpenMode:))
         return YES;
     if (action == @selector(newInstanceFromDock:))
