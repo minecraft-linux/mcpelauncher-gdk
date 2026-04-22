@@ -6,10 +6,6 @@ on:
         description: "mcpelauncher-gdk ref to build"
         required: false
         default: "macOS"
-      vulkan_sdk_version:
-        description: "LunarG Vulkan SDK version"
-        required: false
-        default: "1.4.341.1"
   push:
 
 env:
@@ -61,11 +57,17 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          arch -x86_64 "${INTEL_BREW}" install gnutls freetype
+          arch -x86_64 "${INTEL_BREW}" install gnutls freetype vulkan-headers vulkan-loader molten-vk
           brew install llvm@21 bison
           $(brew --prefix llvm@21)/bin/llvm-dlltool --help || :
           echo Update Env
           echo "LLVM_BINDIR=$(brew --prefix llvm@21)/bin" >> "$GITHUB_ENV"
+          echo Update Env
+          echo "MOLTENVK_DIR=$(arch -x86_64 "${INTEL_BREW}" --prefix molten-vk)" >> "$GITHUB_ENV"
+          echo Update Env
+          echo "VULKAN_HEADER_DIR=$(arch -x86_64 "${INTEL_BREW}" --prefix vulkan-headers)" >> "$GITHUB_ENV"
+          echo Update Env
+          echo "VULKAN_LOADER_DIR=$(arch -x86_64 "${INTEL_BREW}" --prefix vulkan-loader)" >> "$GITHUB_ENV"
           echo Update Env
           echo "$(brew --prefix llvm@21)/bin" >> "$GITHUB_PATH"
           echo Update Env
@@ -77,39 +79,6 @@ jobs:
           set -euxo pipefail
           mkdir -p "$WORKROOT" "$STAGE" "$DIST"
           mkdir -p "$WORKROOT"/downloads "$WORKROOT"/toolchains "$WORKROOT"/src "$WORKROOT"/runtime
-
-      - name: Install LunarG Vulkan SDK
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          VULKAN_SDK_VERSION="${{ inputs.vulkan_sdk_version || '1.4.341.1' }}"
-          SDK_ZIP="vulkansdk-macos-${VULKAN_SDK_VERSION}.zip"
-          SDK_URL="https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/mac/${SDK_ZIP}?Human=true"
-
-          curl -L --retry 3 --fail -o "$WORKROOT/downloads/${SDK_ZIP}" "$SDK_URL"
-          unzip -q "$WORKROOT/downloads/${SDK_ZIP}" -d "$WORKROOT/downloads"
-
-          SDK_APP="$(find "$WORKROOT/downloads" -type d -name 'vulkansdk-macOS-*.app' | head -n1)"
-          if [ -z "$SDK_APP" ]; then
-            echo "Could not find Vulkan SDK app bundle"
-            exit 1
-          fi
-
-          sudo "$SDK_APP/Contents/MacOS/InstallVulkan" \
-            --root "$HOME/VulkanSDK" \
-            --accept-licenses \
-            --default-answer \
-            --confirm-command install
-
-          SDK_DIR="$(find "$HOME/VulkanSDK" -maxdepth 1 -type d -name "${VULKAN_SDK_VERSION}" | head -n1)"
-          if [ -z "$SDK_DIR" ]; then
-            echo "Could not find installed Vulkan SDK dir"
-            exit 1
-          fi
-
-          echo "VULKAN_SDK=$SDK_DIR/macOS" >> "$GITHUB_ENV"
-          echo "$SDK_DIR/macOS/bin" >> "$GITHUB_PATH"
 
       - name: Fetch mcpelauncher-gdk macOS branch
         shell: bash
@@ -128,7 +97,7 @@ jobs:
 
           export SDKROOT="$(xcrun --show-sdk-path)"
 
-          ./configure --prefix="$STAGE" CC=clang CXX=clang++ "CFLAGS=-I/usr/local/include --target=x86_64-apple-darwin" "LDFLAGS=-fuse-ld=lld --target=x86_64-apple-darwin -L$MOLTENVK_DIR/dynamic/dylib/macOS -L/usr/local/lib" "x86_64_CC=${LLVM_BINDIR}/clang" "x86_64_CXX=${LLVM_BINDIR}/clang++" "x86_64_CFLAGS=-g -gcodeview" x86_64_LDFLAGS=-fuse-ld=lld --enable-archs=x86_64 --build=x86_64-apple-darwin --host=x86_64-apple-darwin FREETYPE_CFLAGS=-I/usr/local/include/freetype2 FREETYPE_LIBS=/usr/local/lib/libfreetype.dylib build_alias=x86_64-apple-darwin host_alias=x86_64-apple-darwin
+          ./configure --prefix="$STAGE" CC=clang CXX=clang++ "CFLAGS=-I/usr/local/include -I{VULKAN_HEADER_DIR/include --target=x86_64-apple-darwin" "LDFLAGS=-L$VULKAN_LOADER_DIR/lib -L/usr/local/lib" "x86_64_CC=${LLVM_BINDIR}/clang" "x86_64_CXX=${LLVM_BINDIR}/clang++" "x86_64_CFLAGS=-g -gcodeview" x86_64_LDFLAGS=-fuse-ld=lld --enable-archs=x86_64 --build=x86_64-apple-darwin --host=x86_64-apple-darwin FREETYPE_CFLAGS=-I/usr/local/include/freetype2 FREETYPE_LIBS=/usr/local/lib/libfreetype.6.dylib build_alias=x86_64-apple-darwin host_alias=x86_64-apple-darwin
 
           make -j$(sysctl -n hw.ncpu)
           make install
@@ -150,7 +119,9 @@ jobs:
           # Adjust the list if your final binary links more dependencies.
           for dylib in \
             "${INTEL_PREFIX}/opt/gnutls/lib/libgnutls."*.dylib \
-            "${INTEL_PREFIX}/opt/freetype/lib/libfreetype."*.dylib
+            "${INTEL_PREFIX}/opt/freetype/lib/libfreetype."*.dylib \
+            "${INTEL_PREFIX}/opt/vulkan-loader/lib/libvulkan."*.dylib \
+            "${INTEL_PREFIX}/opt/molten-vk/lib/libMoltenVK.dylib"
           do
             [ -e "$dylib" ] || continue
             cp -av "$dylib" "$STAGE/lib/"
@@ -167,13 +138,19 @@ jobs:
             otool -L "$f" || true
           done
 
-          # Example path fixups for copied brew dylibs
+          # Rewrite only the staged release binaries to load bundled dylibs.
           for f in "${BINARIES[@]}"; do
             install_name_tool -change "${INTEL_PREFIX}/opt/gnutls/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/gnutls/lib/libgnutls.*.dylib | head -n1)")" \
               "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libgnutls.*.dylib | head -n1)")" "$f" || true
 
             install_name_tool -change "${INTEL_PREFIX}/opt/freetype/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/freetype/lib/libfreetype.*.dylib | head -n1)")" \
               "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libfreetype.*.dylib | head -n1)")" "$f" || true
+
+            install_name_tool -change "${INTEL_PREFIX}/opt/vulkan-loader/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/vulkan-loader/lib/libvulkan.*.dylib | head -n1)")" \
+              "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libvulkan.*.dylib | head -n1)")" "$f" || true
+
+            install_name_tool -change "${INTEL_PREFIX}/opt/molten-vk/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/molten-vk/lib/libMoltenVK.dylib | head -n1)")" \
+              "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libMoltenVK.dylib | head -n1)")" "$f" || true
           done
 
       - name: Create self-contained bottle archive
