@@ -8,7 +8,7 @@ SOURCES = \
 	wine_info.plist.in
 
 PROGRAMS = $(WINELOADER_PROGRAMS) wine_bundle_launcher
-INSTALL_LIB = $(WINELOADER_PROGRAMS)
+INSTALL_LIB = $(WINELOADER_PROGRAMS) wine_bundle_launcher
 UNIX_CFLAGS = -fPIE
 
 preloader_EXTRADEFS = -fno-builtin

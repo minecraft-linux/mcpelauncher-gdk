@@ -20,7 +20,8 @@ ICD_DIR="$RUNTIME_DIR/share/vulkan/icd.d"
 PLIST_PATH="$CONTENTS_DIR/Info.plist"
 LAUNCHER_PATH="$MACOS_DIR/$APP_NAME"
 ICD_PATH="$ICD_DIR/MoltenVK_icd.json"
-BUILT_LAUNCHER="$SCRIPT_DIR/loader/wine_bundle_launcher"
+INSTALLED_LAUNCHER="$SRC_DIR/bin/wine_bundle_launcher"
+RUNTIME_LAUNCHER_PATH="$RUNTIME_DIR/bin/wine_bundle_launcher"
 ICON_SOURCE="$SCRIPT_DIR/programs/winecfg/logo.ico"
 ICONSET_DIR="$OUT_DIR/${APP_NAME}.iconset"
 ICON_BASENAME="AppIcon"
@@ -33,14 +34,16 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$RUNTIME_DIR"
 cp -a "$SRC_DIR/." "$RUNTIME_DIR/"
 mkdir -p "$ICD_DIR"
 
-if [[ ! -x "$BUILT_LAUNCHER" ]]; then
-  echo "Missing built launcher: $BUILT_LAUNCHER" >&2
-  echo "Build it first with: make -C \"$SCRIPT_DIR/loader\" wine_bundle_launcher" >&2
+if [[ ! -x "$INSTALLED_LAUNCHER" ]]; then
+  echo "Missing installed launcher: $INSTALLED_LAUNCHER" >&2
+  echo "Build and install it first with: make install" >&2
   exit 1
 fi
 
-cp -a "$BUILT_LAUNCHER" "$LAUNCHER_PATH"
+cp -a "$INSTALLED_LAUNCHER" "$LAUNCHER_PATH"
 chmod 755 "$LAUNCHER_PATH"
+mkdir -p "$(dirname "$RUNTIME_LAUNCHER_PATH")"
+ln -s "../../../MacOS/$APP_NAME" "$RUNTIME_LAUNCHER_PATH"
 
 if [[ -f "$ICON_SOURCE" ]]; then
   rm -rf "$ICONSET_DIR"
