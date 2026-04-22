@@ -20,7 +20,7 @@ ICD_DIR="$RUNTIME_DIR/share/vulkan/icd.d"
 PLIST_PATH="$CONTENTS_DIR/Info.plist"
 LAUNCHER_PATH="$MACOS_DIR/$APP_NAME"
 ICD_PATH="$ICD_DIR/MoltenVK_icd.json"
-INSTALLED_LAUNCHER="$SRC_DIR/bin/wine_bundle_launcher"
+INSTALLED_LAUNCHER=
 RUNTIME_LAUNCHER_PATH="$RUNTIME_DIR/bin/wine_bundle_launcher"
 ICON_SOURCE="$SCRIPT_DIR/programs/winecfg/logo.ico"
 ICONSET_DIR="$OUT_DIR/${APP_NAME}.iconset"
@@ -33,6 +33,13 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$RUNTIME_DIR"
 
 cp -a "$SRC_DIR/." "$RUNTIME_DIR/"
 mkdir -p "$ICD_DIR"
+
+for candidate in "$SRC_DIR"/lib/wine/*-unix/wine_bundle_launcher; do
+  if [[ -x "$candidate" ]]; then
+    INSTALLED_LAUNCHER="$candidate"
+    break
+  fi
+done
 
 if [[ ! -x "$INSTALLED_LAUNCHER" ]]; then
   echo "Missing installed launcher: $INSTALLED_LAUNCHER" >&2
