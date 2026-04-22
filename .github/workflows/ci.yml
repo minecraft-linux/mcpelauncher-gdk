@@ -102,10 +102,10 @@ jobs:
 
           echo "PATH=$PATH"
 
-          arch -x86_64 ./configure --prefix="$STAGE" CC=clang CXX=clang++ "CFLAGS=-I/usr/local/include -I{VULKAN_HEADER_DIR/include --target=x86_64-apple-darwin" "LDFLAGS=-L$VULKAN_LOADER_DIR/lib -L/usr/local/lib" "x86_64_CC=${LLVM_BINDIR}/clang" "x86_64_CXX=${LLVM_BINDIR}/clang++" "x86_64_CFLAGS=-g -gcodeview" x86_64_LDFLAGS=-fuse-ld=lld --enable-archs=x86_64 --build=x86_64-apple-darwin --host=x86_64-apple-darwin FREETYPE_CFLAGS=-I/usr/local/include/freetype2 FREETYPE_LIBS=/usr/local/lib/libfreetype.6.dylib build_alias=x86_64-apple-darwin host_alias=x86_64-apple-darwin
+          arch -x86_64 ./configure --prefix="$STAGE" CC=clang CXX=clang++ "CFLAGS=-I/usr/local/include -I$VULKAN_HEADER_DIR/include --target=x86_64-apple-darwin" "LDFLAGS=-L$VULKAN_LOADER_DIR/lib -L/usr/local/lib" "x86_64_CC=${LLVM_BINDIR}/clang" "x86_64_CXX=${LLVM_BINDIR}/clang++" "x86_64_CFLAGS=-g -gcodeview" x86_64_LDFLAGS=-fuse-ld=lld --enable-archs=x86_64 --build=x86_64-apple-darwin --host=x86_64-apple-darwin FREETYPE_CFLAGS=-I/usr/local/include/freetype2 FREETYPE_LIBS=/usr/local/lib/libfreetype.6.dylib build_alias=x86_64-apple-darwin host_alias=x86_64-apple-darwin
 
-          make -j$(sysctl -n hw.ncpu)
-          make install
+          arch -x86_64 make -j$(sysctl -n hw.ncpu)
+          arch -x86_64 make install
 
       - name: Bundle runtime dependencies
         shell: bash
