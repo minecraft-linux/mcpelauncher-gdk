@@ -169,3 +169,11 @@ jobs:
           name: mcpelauncher-gdk-macos-intel-bottle
           path: dist/*
           if-no-files-found: error
+
+      - name: Upload Log
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mcpelauncher-gdk-macos-intel-log
+          path: src/mcpelauncher-gdk/config.log
+          if-no-files-found: ignore
