@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euxo pipefail
           arch -x86_64 "${INTEL_BREW}" install gnutls freetype vulkan-headers vulkan-loader molten-vk
-          brew install llvm@21 bison
+          brew install llvm@21 bison lld@21
           $(brew --prefix llvm@21)/bin/llvm-dlltool --help || :
           echo Update Env
           echo "LLVM_BINDIR=$(brew --prefix llvm@21)/bin" >> "$GITHUB_ENV"
@@ -70,6 +70,8 @@ jobs:
           echo "VULKAN_LOADER_DIR=$(arch -x86_64 "${INTEL_BREW}" --prefix vulkan-loader)" >> "$GITHUB_ENV"
           echo Update Env
           echo "$(brew --prefix llvm@21)/bin" >> "$GITHUB_PATH"
+          echo Update Env
+          echo "$(brew --prefix lld@21)/bin" >> "$GITHUB_PATH"
           echo Update Env
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
 
@@ -175,5 +177,5 @@ jobs:
         if: always()
         with:
           name: mcpelauncher-gdk-macos-intel-log
-          path: src/mcpelauncher-gdk/config.log
+          path: work/src/mcpelauncher-gdk/config.log
           if-no-files-found: ignore
