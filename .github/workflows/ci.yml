@@ -112,7 +112,7 @@ jobs:
 
       - name: Bundle runtime dependencies
         shell: bash
-        continued-on-error: true
+        continue-on-error: true
         run: |
           set -euxo pipefail
 
