@@ -33,8 +33,6 @@
 #include <sys/types.h>
 #include <dlfcn.h>
 #ifdef SONAME_LIBGNUTLS
-#undef SONAME_LIBGNUTLS
-#define SONAME_LIBGNUTLS "/usr/local/lib/libgnutls.30.dylib"
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
 #include <gnutls/abstract.h>

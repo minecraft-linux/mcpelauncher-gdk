@@ -487,9 +487,6 @@ static HRESULT vkd3d_init_vk_global_procs(struct vkd3d_instance *instance,
 
     if (!vkGetInstanceProcAddr)
     {
-#undef SONAME_LIBVULKAN
-#define SONAME_LIBVULKAN "/usr/local/lib/libvulkan.1.4.341.dylib"
-
         if (!(instance->libvulkan = vkd3d_dlopen(SONAME_LIBVULKAN)))
         {
             ERR("Failed to load libvulkan: %s.\n", vkd3d_dlerror());
