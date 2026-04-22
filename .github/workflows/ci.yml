@@ -90,7 +90,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          git clone --depth 1 --branch "${{ inputs.mcpelauncher_ref || '${{ github.ref_name }}' }}" \
+          git clone --depth 1 --branch "${{ inputs.mcpelauncher_ref || github.ref_name }}" \
             https://github.com/minecraft-linux/mcpelauncher-gdk.git \
             "$WORKROOT/src/mcpelauncher-gdk"
 
@@ -110,56 +110,21 @@ jobs:
           make -j$(sysctl -n hw.ncpu)
           make install
 
-      - name: Install into staging
-        shell: bash
-        run: |
-          set -euxo pipefail
-          cmake --install "$WORKROOT/build"
-
       - name: Bundle runtime dependencies
         shell: bash
+        continued-on-error: true
         run: |
           set -euxo pipefail
 
           mkdir -p "$STAGE/lib" "$STAGE/share/minecraft-gdk-runtime"
 
-          # Copy Intel brew dylibs that are likely needed at runtime.
-          # Adjust the list if your final binary links more dependencies.
-          for dylib in \
+          zsh "$WORKROOT/src/mcpelauncher-gdk/bundle-macho-deps.zsh" \
+            "$STAGE" \
+            "$STAGE/lib" \
             "${INTEL_PREFIX}/opt/gnutls/lib/libgnutls."*.dylib \
             "${INTEL_PREFIX}/opt/freetype/lib/libfreetype."*.dylib \
             "${INTEL_PREFIX}/opt/vulkan-loader/lib/libvulkan."*.dylib \
             "${INTEL_PREFIX}/opt/molten-vk/lib/libMoltenVK.dylib"
-          do
-            [ -e "$dylib" ] || continue
-            cp -av "$dylib" "$STAGE/lib/"
-          done
-
-      - name: Rewrite dylib paths to be self-contained
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          mapfile -t BINARIES < <(find "$STAGE" -type f \( -perm -111 -o -name '*.dylib' \))
-
-          for f in "${BINARIES[@]}"; do
-            otool -L "$f" || true
-          done
-
-          # Rewrite only the staged release binaries to load bundled dylibs.
-          for f in "${BINARIES[@]}"; do
-            install_name_tool -change "${INTEL_PREFIX}/opt/gnutls/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/gnutls/lib/libgnutls.*.dylib | head -n1)")" \
-              "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libgnutls.*.dylib | head -n1)")" "$f" || true
-
-            install_name_tool -change "${INTEL_PREFIX}/opt/freetype/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/freetype/lib/libfreetype.*.dylib | head -n1)")" \
-              "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libfreetype.*.dylib | head -n1)")" "$f" || true
-
-            install_name_tool -change "${INTEL_PREFIX}/opt/vulkan-loader/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/vulkan-loader/lib/libvulkan.*.dylib | head -n1)")" \
-              "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libvulkan.*.dylib | head -n1)")" "$f" || true
-
-            install_name_tool -change "${INTEL_PREFIX}/opt/molten-vk/lib/$(basename "$(ls ${INTEL_PREFIX}/opt/molten-vk/lib/libMoltenVK.dylib | head -n1)")" \
-              "@loader_path/../lib/$(basename "$(ls ${STAGE}/lib/libMoltenVK.dylib | head -n1)")" "$f" || true
-          done
 
       - name: Create self-contained bottle archive
         shell: bash
