@@ -3057,8 +3057,6 @@ static void vulkan_init_once(void)
     VkResult res;
 
 #ifdef SONAME_LIBVULKAN
-#undef SONAME_LIBVULKAN
-#define SONAME_LIBVULKAN "/usr/local/lib/libvulkan.1.4.341.dylib"
     vulkan_handle = dlopen( SONAME_LIBVULKAN, RTLD_NOW );
     if (!vulkan_handle) ERR( "Failed to load %s\n", SONAME_LIBVULKAN );
 #else
