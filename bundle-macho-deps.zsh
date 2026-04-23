@@ -16,6 +16,7 @@ mkdir -p "$FRAMEWORKS_DIR"
 
 typeset -A SEEN
 typeset -A COPIED_FROM
+typeset -A COPIED_BASENAME_BY_REALPATH
 
 is_macho() {
   local f="$1"
@@ -53,13 +54,19 @@ list_deps() {
 
 copy_one_lib() {
   local src="$1"
-  local real src_base dst
+  local real src_base dst_base dst
 
   real="$(resolve_realpath "$src")"
   src_base="$(basename "$src")"
-  dst="$FRAMEWORKS_DIR/$src_base"
+  dst_base="$src_base"
+  dst="$FRAMEWORKS_DIR/$dst_base"
 
   if [[ -n "${SEEN[$real]-}" ]]; then
+    if [[ "$src_base" == libvulkan.*.dylib && "$src_base" != "${COPIED_BASENAME_BY_REALPATH[$real]-}" ]]; then
+      echo "Symlink: $FRAMEWORKS_DIR/$src_base -> ${COPIED_BASENAME_BY_REALPATH[$real]}"
+      ln -sfn "${COPIED_BASENAME_BY_REALPATH[$real]}" "$FRAMEWORKS_DIR/$src_base"
+      COPIED_FROM[$src_base]="$real"
+    fi
     return 0
   fi
   SEEN[$real]=1
@@ -68,7 +75,14 @@ copy_one_lib() {
   cp -f "$real" "$dst"
   chmod u+w "$dst" || true
 
-  COPIED_FROM[$src_base]="$real"
+  COPIED_FROM[$dst_base]="$real"
+  COPIED_BASENAME_BY_REALPATH[$real]="$dst_base"
+
+  if [[ "$src_base" == libvulkan.*.dylib && "$src_base" != "$dst_base" ]]; then
+    echo "Symlink: $FRAMEWORKS_DIR/$src_base -> $dst_base"
+    ln -sfn "$dst_base" "$FRAMEWORKS_DIR/$src_base"
+    COPIED_FROM[$src_base]="$real"
+  fi
 
   recurse_copy_brew_deps "$real"
 }
@@ -94,19 +108,27 @@ set_id_to_rpath() {
 
 patch_refs_to_frameworks() {
   local f="$1"
-  local dep dep_base
+  local dep dep_base dep_real copied_base
 
   while IFS= read -r dep; do
     [[ -z "$dep" ]] && continue
     dep_base="$(basename "$dep")"
+    copied_base=""
 
-    if [[ -f "$FRAMEWORKS_DIR/$dep_base" ]]; then
+    if [[ -f "$FRAMEWORKS_DIR/$dep_base" || -L "$FRAMEWORKS_DIR/$dep_base" ]]; then
+      copied_base="$dep_base"
+    elif is_brew_lib "$dep" && [[ -e "$dep" ]]; then
+      dep_real="$(resolve_realpath "$dep")"
+      copied_base="${COPIED_BASENAME_BY_REALPATH[$dep_real]-}"
+    fi
+
+    if [[ -n "$copied_base" && ( -f "$FRAMEWORKS_DIR/$copied_base" || -L "$FRAMEWORKS_DIR/$copied_base" ) ]]; then
       echo "Rewrite dep in $f:"
       echo "  from: $dep"
-      echo "  to:   @rpath/$dep_base"
+      echo "  to:   @rpath/$copied_base"
 
       chmod u+w "$f" || true
-      install_name_tool -change "$dep" "@rpath/$dep_base" "$f"
+      install_name_tool -change "$dep" "@rpath/$copied_base" "$f"
     fi
   done < <(list_deps "$f")
 }
