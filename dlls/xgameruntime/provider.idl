@@ -295,6 +295,24 @@ interface IXUserGamertag : IUnknown
 }
 
 [
+    local,
+    object,
+    uuid(2549f142-6419-4a06-97b5-931aab7c2f34)
+]
+interface IXGameLaunch : IUnknown
+{
+    HRESULT XGameGetXboxTitleId( [out] uint32_t* titleId );
+    HRESULT STUB1();
+    HRESULT STUB2();
+}
+
+[
+    object
+]
+interface IXGameLaunchImpl : IXGameLaunch
+{}
+
+[
     uuid(e349bd1a-fc20-4e40-b99c-4178cc6b409f)
 ]
 coclass XSystemImpl
@@ -325,4 +343,12 @@ coclass XUserImpl
 {
     [default] interface IXUserImpl;
     interface IXUserGamertag;
+}
+
+[
+    uuid(973a344e-24bf-4d0f-8457-56c534892b29)
+]
+coclass XGameLaunch
+{
+    [default] interface IXGameLaunchImpl;
 }

@@ -45,8 +45,9 @@ static HRESULT CALLBACK HTTPClientProvider( XAsyncOp operation, const XAsyncProv
 
         case DoWork:
         {
-            status = httpclient_ObtainSecurityInformationForUrl( context->url, &context->securityInformationBuffer, &context->securityInformationBufferCount, &context->securityInformation );
-
+            //status = httpclient_ObtainSecurityInformationForUrl( context->url, &context->securityInformationBuffer, &context->securityInformationBufferCount, &context->securityInformation );
+            status = 0;
+            FIXME("XNetworkingQuerySecurityInformationForUrlUtf16Async: %s", context->url);
             IXThreadingImpl_XAsyncComplete( threadingImpl, data->async, status, context->securityInformationBufferCount );
 
             return status;
@@ -207,8 +208,9 @@ static HRESULT WINAPI x_networking_XNetworkingQuerySecurityInformationForUrlUtf1
     status = QueryApiImpl( &CLSID_XThreadingImpl, &IID_IXThreadingImpl, (void **)&threadingImpl );
     if ( FAILED( status ) ) return status;
 
-    status = IXThreadingImpl_XAsyncGetResultSize( threadingImpl, asyncBlock, securityInformationBufferByteCount );
-
+    //status = IXThreadingImpl_XAsyncGetResultSize( threadingImpl, asyncBlock, securityInformationBufferByteCount );
+    status = 0;
+    *securityInformationBufferByteCount = sizeof(XNetworkingSecurityInformation);
     return status;
 }
 
@@ -223,12 +225,14 @@ static HRESULT WINAPI x_networking_XNetworkingQuerySecurityInformationForUrlUtf1
     status = QueryApiImpl( &CLSID_XThreadingImpl, &IID_IXThreadingImpl, (void **)&threadingImpl );
     if ( FAILED( status ) ) return status;
 
-    status = IXThreadingImpl_XAsyncGetResult( threadingImpl, asyncBlock, NULL, securityInformationBufferByteCount, securityInformationBuffer, securityInformationBufferByteCountUsed );
-    if ( FAILED( status ) ) return status;
+    // status = IXThreadingImpl_XAsyncGetResult( threadingImpl, asyncBlock, NULL, securityInformationBufferByteCount, securityInformationBuffer, securityInformationBufferByteCountUsed );
+    // if ( FAILED( status ) ) return status;
 
     // Extract the XNetworkingSecurityInformation header from the buffer.
     *securityInformation = (XNetworkingSecurityInformation *)securityInformationBuffer;
-
+    (*securityInformation)->thumbprintCount = 0;
+    (*securityInformation)->thumbprints = NULL;
+    (*securityInformation)->enabledHttpSecurityProtocolFlags = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
     return S_OK;
 }
 

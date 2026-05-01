@@ -19,5 +19,6 @@ SOURCES = \
 	GDKComponent/System/Networking/HTTPClient.c \
 	GDKComponent/System/Networking/XNetworking.c \
 	GDKComponent/System/User/Token.c \
-	GDKComponent/System/User/XUser.c
+	GDKComponent/System/User/XUser.c \
+	GDKComponent/XGameLaunch.c
 
